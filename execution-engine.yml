@@ -2,7 +2,7 @@ version: "3.1"
 #
 services:
   registry:
-#    image: dockerhubwithsimpleapp
+    #    image: dockerhubwithsimpleapp
     image: registry
     ports:
       - "5000:5000"
@@ -20,8 +20,8 @@ services:
       - "/var/log/nginx/access.log"
       - "-stdout"
       - "/var/log/nginx/error.log"
-    #  - "-env"
-    #  - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/nginx-minikb.ini"
+      #  - "-env"
+      #  - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/nginx-minikb.ini"
       - "nginx"
     env_file:
       - deployment/conf/nginx-minikb.ini
@@ -33,7 +33,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    depends_on: ["auth", "handle_service", "handle_manager", "ws", "ujs", "njs", "narrative_method_store",  "catalog"] 
+    depends_on: ["auth", "handle_service", "handle_manager", "ws",  "njs", "narrative_method_store",  "catalog"]
 
   narrative_method_store:
     image: kbase/narrative_method_store:develop
@@ -41,7 +41,7 @@ services:
       - "-wait"
       - "tcp://auth:8080"
       - "-timeout"
-      - "150s" 
+      - "150s"
       - "-template"
       - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
       - "-template"
@@ -67,7 +67,7 @@ services:
     volumes:
       - /refdata/:/kbase/data/sdk/ci/refdata
       - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/:/tmp/ 
+      - /tmp/:/tmp/
     command:
       - "-template"
       - "/kb/deployment/conf/.templates/deploy.minikb.cfg.templ:/kb/deployment/conf/deploy.cfg"
@@ -100,8 +100,8 @@ services:
       - "/usr/sbin/start-condor.sh"
       #- "sleep"
       #- "36000"
-      
-  
+
+
   condor_worker_max:
     image: kbase/condor-worker:develop
     hostname: condor_worker_max
@@ -126,7 +126,7 @@ services:
       - CLIENTGROUP="bigmem"
       - USE_TCP=True
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/condor:/mnt/condor
       - /sys/fs/cgroup:/sys/fs/cgroup
       # The line below DOES NOT WORK FOR MacOS, but should uncommented for Unix hosts
@@ -142,26 +142,26 @@ services:
       - "/kb/deployment/conf/.templates/shared_port_config.templ:/etc/condor/config.d/shared_port_config"
       - "-timeout"
       - "120s"
-#     Use the euid and egid flags to set the uid/gid of the final process to be run. Note
-#     that the container must start as root for this to work in most situations
-#      - "-euid"
-#      - "998"
-#      - "-egid"
-#      - "997"
+      #     Use the euid and egid flags to set the uid/gid of the final process to be run. Note
+      #     that the container must start as root for this to work in most situations
+      #      - "-euid"
+      #      - "998"
+      #      - "-egid"
+      #      - "997"
       - "-stdout"
       - "/var/log/condor/ProcLog"
       - "-stdout"
       - "/var/log/condor/StartLog"
       - "/kb/deployment/bin/start-condor.sh"
-#      - "sleep"
-#      - "10000"
+    #      - "sleep"
+    #      - "10000"
     depends_on: ["condor"]
     environment:
       - POOL_PASSWORD=weakpassword
       - COLLECTOR_HOST=condor:9618?sock=collector
       - USE_TCP=True
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
       - /mnt/condor:/mnt/condor
       - /sys/fs/cgroup:/sys/fs/cgroup
       # The line below DOES NOT WORK FOR MacOS, but should uncommented for Unix hosts
@@ -169,23 +169,13 @@ services:
 
   #- "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/njs-wrapper-minikb.ini"
   njs:
-    image: kbase/njs_wrapper:develop
+    image: kbase/ee2:develop
     command:
       - "-poll"
-      #- "-env"
-      #- "https://raw.githubusercontent.com/bio-boris/mini_kb/justExecutionEngine/deployment/conf/njs-wrapper-minikb.ini"
       - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
+      - "/kb/module/build/templates/condor_config.templ:/etc/condor/condor_config"
       - "-template"
-      - "/kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini"
-      - "-template"
-      - "/kb/deployment/misc/sdklocalmethodrunner_dev.sh:/kb/deployment/misc/sdklocalmethodrunner.sh"
-      - "-template"
-      - "/kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/start_server.sh.templ:/kb/deployment/bin/start_server.sh"
-      - "-template"
-      - "/kb/deployment/conf/.templates/condor_config.templ:/etc/condor/condor_config.local"
+      - "/kb/module/build/templates/deploy2.templ:/kb/module/deploy.cfg"
       - "-timeout"
       - "120s"
       - "-wait"
@@ -198,11 +188,13 @@ services:
       - "tcp://ws:8080"
       - "-stdout"
       - "/kb/deployment/jettybase/logs/request.log"
-      - "/kb/deployment/bin/start_server.sh"
-    depends_on: ["auth", "ws", "ci-mongo","db-init","ujs","condor"]
+      - "./scripts/entrypoint.sh"
+
+    entrypoint: [ "/kb/deployment/bin/dockerize" ]
+    depends_on: ["auth", "ws", "ci-mongo","db-init","condor"]
     environment:
       - POOL_PASSWORD=weakpassword
-    env_file: deployment/conf/njs-wrapper-minikb.ini
+    env_file: deployment/conf/ee2.ini
     volumes:
       - /mnt/condor:/mnt/condor
       - /mnt/condor/service.pid:/kb/deployment/services/catalog/service.pid
@@ -210,35 +202,6 @@ services:
       # Place your jars directory and njs_wrapper code here for local dev
       # - /njs_wrapper:/njs_wrapper
 
-  ujs:
-    image: kbase/ujs:develop
-    command:
-      - "-poll"
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/ujs-minikb.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/start_server.sh.templ:/kb/deployment/bin/start_server.sh"
-      - "-timeout"
-      - "120s"
-      - "-wait"
-      - "tcp://ci-mongo:27017"
-      - "-wait"
-      - "tcp://db-init:8080"
-      - "-wait"
-      - "tcp://auth:8080"
-      - "-wait"
-      - "tcp://ws:8080"
-      - "-stdout"
-      - "/kb/deployment/jettybase/logs/request.log"
-      - "/kb/deployment/bin/start_server.sh"
-      # 
-    depends_on: ["auth", "ws", "ci-mongo","db-init"]
 
 
   ws:
@@ -287,7 +250,7 @@ services:
     tty: true
     volumes:
       - .:/home/workspace_deluxe
-  
+
   handle_service:
     image: kbase/handle_service:develop
     command:
@@ -399,7 +362,12 @@ services:
       - "27017:27017"
     command: --smallfiles
 
-  
+  ci-mongo-latest:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    command: --smallfiles
+
   ci-mysql:
     image: mysql:5.5
     command:
@@ -408,7 +376,7 @@ services:
       - "--wait-timeout=600"
       - "--innodb_log_buffer_size=32M"
       - "--innodb_buffer_pool_size=256M"
-#      - "--innodb_log_file_size=128M"
+    #      - "--innodb_log_file_size=128M"
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     #ports:
