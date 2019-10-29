@@ -175,7 +175,7 @@ services:
       - "-template"
       - "/kb/module/build/templates/condor_config.templ:/etc/condor/condor_config"
       - "-template"
-      - "/kb/module/build/templates/deploy2.templ:/kb/module/deploy.cfg"
+      - "/kb/module/build/templates/minikb.templ:/kb/module/deploy.cfg"
       - "-timeout"
       - "120s"
       - "-wait"
@@ -189,7 +189,6 @@ services:
       - "-stdout"
       - "/kb/deployment/jettybase/logs/request.log"
       - "./scripts/entrypoint.sh"
-
     entrypoint: [ "/kb/deployment/bin/dockerize" ]
     depends_on: ["auth", "ws", "ci-mongo","db-init","condor"]
     environment:
@@ -199,8 +198,39 @@ services:
       - /mnt/condor:/mnt/condor
       - /mnt/condor/service.pid:/kb/deployment/services/catalog/service.pid
       - /mnt/condor/error.log:/kb/deployment/services/catalog/error.log
-      # Place your jars directory and njs_wrapper code here for local dev
-      # - /njs_wrapper:/njs_wrapper
+
+
+  njs_with_ssh:
+    image: kbase/ee2:develop
+    ports: ["23:22"]
+    command:
+      - "-poll"
+      - "-template"
+      - "/kb/module/build/templates/condor_config.templ:/etc/condor/condor_config"
+      - "-template"
+      - "/kb/module/build/templates/minikb.templ:/kb/module/deploy.cfg"
+      - "-timeout"
+      - "120s"
+      - "-wait"
+      - "tcp://ci-mongo:27017"
+      - "-wait"
+      - "tcp://db-init:8080"
+      - "-wait"
+      - "tcp://auth:8080"
+      - "-wait"
+      - "tcp://ws:8080"
+      - "-stdout"
+      - "/kb/deployment/jettybase/logs/request.log"
+      - "./scripts/entrypoint_with_ssh.sh"
+    entrypoint: [ "/kb/deployment/bin/dockerize" ]
+    depends_on: ["auth", "ws", "ci-mongo","db-init","condor"]
+    environment:
+      - POOL_PASSWORD=weakpassword
+    env_file: deployment/conf/ee2.ini
+    volumes:
+      - /mnt/condor:/mnt/condor
+      - /mnt/condor/service.pid:/kb/deployment/services/catalog/service.pid
+      - /mnt/condor/error.log:/kb/deployment/services/catalog/error.log
 
 
 
@@ -366,7 +396,7 @@ services:
     image: mongo:latest
     ports:
       - "27018:27017"
-    command: --smallfiles
+
 
   ci-mysql:
     image: mysql:5.5
