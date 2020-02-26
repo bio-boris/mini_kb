@@ -1,22 +1,6 @@
 version: "3.1"
 #
 services:
-  registry:
-    image: registry
-  
-  rancher:
-    image: rancher/server:v1.6.21
-    command:
-      - "--db-host"
-      - "ci-mysql"
-      - "--db-port"
-      - "3306"
-      - "--db-user"
-      - "cattle"
-      - "--db-pass"
-      - "cattle"
-      - "--db-name"
-      - "cattle"
   nginx:
     image: kbase/nginx:mini
     command:
@@ -30,8 +14,6 @@ services:
       - "/var/log/nginx/access.log"
       - "-stdout"
       - "/var/log/nginx/error.log"
-    #  - "-env"
-    #  - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/nginx-minikb.ini"
       - "nginx"
     env_file:
       - deployment/conf/nginx-minikb.ini
@@ -41,21 +23,20 @@ services:
     # volumes:
     #  - /tmp/nginx.conf:/etc/nginx/nginx,conf
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "80:80"
       - "443:443"
-    depends_on: ["auth", "ws", "shock", "narrative_version", "kbase-ui", "searchapi", "service_wizard", "narrative_method_store", "user_profile", "catalog" ]
-  # stubs for service_wizard, narrative_method_store, user_profile, catalog to capture the URLs that are being requested
-  service_wizard:
-    image: kbase/service_wizard:dockerize
-    command:
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "/kb/deployment/services/service_wizard/start_service"
-    env_file:
-      - deployment/conf/servicewiz-minikb.ini
-    depends_on: ["rancher", "registry" ]
+    depends_on:
+      [
+        "auth",
+        "ws",
+        "shock",
+        "narrative_version",
+
+        "narrative_method_store",
+        "catalog",
+      ]
 
   narrative_method_store:
     image: kbase/narrative_method_store:develop
@@ -73,11 +54,11 @@ services:
       - "/kb/deployment/bin/start_server.sh"
     env_file:
       - deployment/conf/nms-minikb.ini
-    depends_on: ["auth", "ci-mongo" ]
+    depends_on: ["auth", "ci-mongo"]
   catalog:
     image: kbase/catalog:latest
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
     command:
       - "-template"
       - "/kb/deployment/conf/.templates/deploy.cfg.templ:/kb/deployment/conf/deploy.cfg"
@@ -85,263 +66,16 @@ services:
       - "-stderr"
       - "/kb/deployment/services/catalog/error.log"
       - "/kb/deployment/services/catalog/start_service"
-    depends_on: ["auth", "ci-mongo", "narrative_method_store" ]
+    depends_on: ["auth", "ci-mongo", "narrative_method_store"]
     env_file:
       - deployment/conf/catalog-minikb.ini
-  user_profile:
-    image: kbase/user_profile:latest
-    command:
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/start-server.sh.templ:/kb/deployment/bin/start-server.sh"
-      - "-stdout"
-      - "/kb/deployment/jettybase/logs/request.log"
-      - "-poll"
-      - "/bin/sh"
-      - "/kb/deployment/bin/start-server.sh"
-    env_file:
-      - deployment/conf/user_profile.ini
+
   narrative_version:
     image: kbase/narrative_version:latest
-  kbase-ui:
-    image: kbase/kbase-ui:latest
-    command:
-      - "-poll"
-      - "-stdout"
-      - "/var/log/nginx/access.log"
-      - "-stderr"
-      - "/var/log/nginx/err.log"
-      - "-template"
-      - "/kb/deployment/templates/nginx.conf.tmpl:/etc/nginx/nginx.conf"
-      - "-template"
-      - "/kb/deployment/templates/config.json.tmpl:/kb/deployment/services/kbase-ui/dist/modules/deploy/config.json"
-      - "bash"
-      - "/kb/deployment/scripts/start-server.bash"
-    # Alternatively you can comment out the -env params to the container and use your local
-    # environment definitions with something like the following:
-    # environment:
-    #   - name=value
-    #   - name2=value2
-    #
-    # Or if you want to use a file:
-    env_file:
-      - deployment/conf/kbase-ui-minikb.ini
-
-  searchapi:
-    image: kbase/kb_search:latest
-    command:
-    - -template
-    - /kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg
-    - -template
-    - /kb/deployment/conf/.templates/search_tools.cfg.templ:/kb/deployment/conf/search_tools.cfg
-    - -template
-    - /kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini
-    - -template
-    - /kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini
-    - -template
-    - /kb/deployment/conf/.templates/start_server.sh.templ:/kb/deployment/bin/start_server.sh
-    - "-wait"
-    - "tcp://ws:8080"
-    - "-wait"
-    - "tcp://auth:8080"
-    - "-wait"
-    - "tcp://elastic:9200"
-    - "-timeout"
-    - "150s"
-    - "-stdout"
-    - "/kb/deployment/jettybase/logs/request.log"
-    - "/kb/deployment/bin/entrypoint.sh"
-    env_file:
-      - deployment/conf/search-minikb.ini
-    depends_on: ["auth", "handle_service", "ws", "shock", "ujs", "elastic"]
-
-
-  search:
-    image: kbase/kb_search:latest
-    command:
-      - "-poll"
-      - "-stdout"
-      - "/kb/deployment/jettybase/logs/request.log"
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/search-minikb.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/search_tools.cfg.templ:/kb/deployment/conf/search_tools.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/start_server.sh.templ:/kb/deployment/bin/start_server.sh"
-      - "-timeout"
-      - "120s"
-      - "-wait"
-      - "tcp://auth:8080"
-      - "-wait"
-      - "tcp://ws:8080"
-      - "-wait"
-      - "tcp://elastic:9200"
-      - "/kb/deployment/bin/entrypoint.sh"
-    depends_on: ["auth", "handle_service", "ws", "shock", "ujs", "elastic"]
-
-  coordinator:
-    image: kbase/kb_search:latest
-    command:
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/search-minikb.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/search_tools.cfg.templ:/kb/deployment/conf/search_tools.cfg"
-      - "/kb/deployment/bin/entrypoint.sh"
-      - "coordinator"
-    depends_on: ["auth", "handle_service", "ws", "shock", "ujs", "nginx", "ci-mongo"]
-
-  worker:
-    image: kbase/kb_search:latest
-    command:
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/search-minikb.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/search_tools.cfg.templ:/kb/deployment/conf/search_tools.cfg"
-      - "-timeout"
-      - "120s"
-      - "-wait"
-      - "tcp://auth:8080"
-      - "-wait"
-      - "tcp://ws:8080"
-      - "/kb/deployment/bin/entrypoint.sh"
-      - "worker"
-    depends_on: ["auth", "handle_service", "ws", "shock", "ujs", "nginx", "ci-mongo"]
-
-  logstash:
-    image: kbase/kb_logstash:latest
-    command:
-      - "-template"
-      - "/usr/share/logstash/.templates/10inputs.templ:/usr/share/logstash/pipeline/10inputs"
-      - "-template"
-      - "/usr/share/logstash/.templates/99outputs.templ:/usr/share/logstash/pipeline/99outputs"
-      - "-timeout"
-      - "120s"
-      - "-wait"
-      - "tcp://elastic:9200"
-      - "logstash"
-    ports:
-      - "9000:9000"
-    environment:
-      - "debug_output=1"
-      - "elastic_server=elastic:9200"
-    depends_on: ["elastic"]
-
-  elastic:
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.5
-    ports:
-      - "9200:9200"
-      - "9300:9300"
-    environment:
-      - xpack.security.enabled=false
-      - xpack.monitoring.enabled=false
-      - xpack.ml.enabled=false
-      - xpack.graph.enabled=false
-      - xpack.watcher.enabled=false
-      - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-  
-  njs:
-    image: kbase/kb_njs_wrapper:latest
-    command:
-      - "-poll"
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/njs-wrapper-minikb.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/start_server.sh.templ:/kb/deployment/bin/start_server.sh"
-      - "-timeout"
-      - "120s"
-      - "-wait"
-      - "tcp://ci-mongo:27017"
-      - "-wait"
-      - "tcp://db-init:8080"
-      - "-wait"
-      - "tcp://auth:8080"
-      - "-wait"
-      - "tcp://awe:8080"
-      - "-wait"
-      - "tcp://ws:8080"
-      - "-stdout"
-      - "/kb/deployment/jettybase/logs/request.log"
-      - "/kb/deployment/bin/start_server.sh"
-    depends_on: ["auth", "awe", "ws", "ci-mongo","db-init","ujs"]
-    # env_file: deployment/conf/njs-wrapper-minikb.ini
-
-  ujs:
-    image: kbase/kb_ujs:latest
-    command:
-      - "-poll"
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/ujs-minikb.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg"
-      - "-template"
-      - "/kb/deployment/conf/.templates/http.ini.templ:/kb/deployment/jettybase/start.d/http.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/server.ini.templ:/kb/deployment/jettybase/start.d/server.ini"
-      - "-template"
-      - "/kb/deployment/conf/.templates/start_server.sh.templ:/kb/deployment/bin/start_server.sh"
-      - "-timeout"
-      - "120s"
-      - "-wait"
-      - "tcp://ci-mongo:27017"
-      - "-wait"
-      - "tcp://db-init:8080"
-      - "-wait"
-      - "tcp://auth:8080"
-      - "-wait"
-      - "tcp://awe:8080"
-      - "-wait"
-      - "tcp://ws:8080"
-      - "-stdout"
-      - "/kb/deployment/jettybase/logs/request.log"
-      - "/kb/deployment/bin/start_server.sh"
-      # 
-    depends_on: ["auth", "awe", "ws", "ci-mongo","db-init"]
-
-  awe:
-    image: kbase/kb_awe:latest
-    command:
-      - "-poll"
-      - "-wait"
-      - "tcp://ci-mongo:27017"
-      - "-wait"
-      - "tcp://db-init:8080"
-      - "-timeout"
-      - "120s"
-      - "-template"
-      - "/kb/deployment/conf/.templates/awe-server.cfg.templ:/kb/deployment/conf/awe-server.cfg"
-      - "-env"
-      - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/awe-minikb.ini"
-      - "/kb/deployment/bin/awe-server"
-      - "--conf"
-      - "/kb/deployment/conf/awe-server.cfg" 
-    #ports:
-    #  - "8080:8080"
-    depends_on: ["ci-mongo","db-init"]
 
   ws:
-    image: kbase/kb_workspace:develop
+    image: kbase/kb_workspace:latest
+    #image: a383f3c5d55b813e912b9324205bf5b6bc12fdc5f2c945e52c47112d6b4eb223
     command:
       - "-poll"
       - "-template"
@@ -355,6 +89,7 @@ services:
       - "-template"
       - "/kb/deployment/conf/.templates/setenv.sh.templ:/kb/deployment/services/workspace/tomcat/bin/setenv.sh"
       - "-env"
+      #- "https://raw.githubusercontent.com/bio-boris/mini_kb/master/deployment/conf/workspace-minikb.ini"
       - "https://raw.githubusercontent.com/kbase/mini_kb/master/deployment/conf/workspace-minikb.ini"
       - "-wait"
       - "tcp://ci-mongo:27017"
@@ -376,17 +111,25 @@ services:
       - "run"
     #ports:
     #  - "7058:7058"
-    depends_on: ["auth", "handle_service", "handle_manager", "ci-mongo","db-init", "shock"]
+    depends_on:
+      [
+        "auth",
+        "handle_service",
+        "handle_manager",
+        "ci-mongo",
+        "db-init",
+        "shock",
+      ]
     # Mount this stuff in when running initialize.py is needed to reset workspace config
 
   shell:
     image: kbase/db_initialize
-    entrypoint: [ "/bin/bash"]
+    entrypoint: ["/bin/bash"]
     stdin_open: true
     tty: true
     volumes:
       - .:/home/workspace_deluxe
-  
+
   handle_service:
     image: kbase/handle_service:develop
     command:
@@ -413,7 +156,7 @@ services:
       - KB_SERVICE_NAME=handle_service
     #ports:
     #  - "7109:7109"
-    depends_on: ["handle_manager", "ci-mysql", "shock", "auth","db-init"]
+    depends_on: ["handle_manager", "ci-mysql", "shock", "auth", "db-init"]
 
   shock:
     image: kbase/kb_shock:develop
@@ -454,7 +197,7 @@ services:
       - "/kb/deployment/lib/Bio/KBase/HandleMngr/HandleMngr.psgi"
     #ports:
     #  - "9001:9001"
-    depends_on: ["auth","db-init"]
+    depends_on: ["auth", "db-init"]
 
   auth:
     image: kbase/kb_auth2:develop
@@ -474,7 +217,7 @@ services:
     #  - deployment/conf/auth2-minikb.ini
     #ports:
     #  - "8080:8080"
-    depends_on: ["ci-mongo","db-init"]
+    depends_on: ["ci-mongo", "db-init"]
 
   db-init:
     image: kbase/db_initialize
@@ -491,7 +234,7 @@ services:
       - -timeout
       - 120s
       - /tmp/bin/initialize_all.sh
-    depends_on: ['ci-mysql','ci-mongo']
+    depends_on: ["ci-mysql", "ci-mongo"]
 
   ci-mongo:
     image: mongo:2
@@ -499,7 +242,6 @@ services:
       - "27017:27017"
     command: --smallfiles
 
-  
   ci-mysql:
     image: mysql:5.5
     command:
@@ -508,7 +250,7 @@ services:
       - "--wait-timeout=600"
       - "--innodb_log_buffer_size=32M"
       - "--innodb_buffer_pool_size=256M"
-#      - "--innodb_log_file_size=128M"
+    #      - "--innodb_log_file_size=128M"
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     #ports:
